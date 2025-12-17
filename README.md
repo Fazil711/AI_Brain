@@ -7,7 +7,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![LangChain](https://img.shields.io/badge/LangChain-Agents-green)
 ![Streamlit](https://img.shields.io/badge/Streamlit-UI-red)
-![Google Gemini](https://img.shields.io/badge/Model-Gemini%201.5%20Flash-orange)
+![Google Gemini](https://img.shields.io/badge/Model-Gemini%202.5%20Flash-orange)
 
 ## 🚀 Overview
 
@@ -31,7 +31,7 @@ This project goes beyond a simple chatbot. It is an **Agentic RAG System** built
 * **🕵️ Agentic Search:** Uses a "Router" architecture to autonomously decide whether to use internal documents, Google Search, or YouTube analysis.
 * **📚 RAG (Retrieval Augmented Generation):** Ingests PDFs/Text files, splits them into chunks, embeds them locally (HuggingFace), and stores them in ChromaDB.
 * **🎥 YouTube Intelligence:** Can watch (transcribe) YouTube videos via URL and answer questions about specific timestamped content.
-* **🧠 Multi-Model Brain:** Instant toggle between **Google Gemini 1.5 Flash** (Free/Fast) and **OpenAI GPT-4o** (High Reasoning).
+* **🧠 Multi-Model Brain:** Instant toggle between **Google Gemini 2.5 Flash** (Fast) and **OpenAI GPT-4o** (High Reasoning).
 * **💾 Persistent Memory:** Uses an integrated **SQLite** database to save chat history, ensuring conversations persist across reloads.
 * **☁️ Cloud Ready:** Deployed with `pysqlite3` fixes to ensure compatibility with Streamlit Community Cloud.
 
