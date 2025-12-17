@@ -39,7 +39,7 @@ This project goes beyond a simple chatbot. It is an **Agentic RAG System** built
 
 * **Framework:** LangChain (Python)
 * **Frontend:** Streamlit
-* **LLMs:** Google Gemini 1.5 Flash, OpenAI GPT-4o
+* **LLMs:** Google Gemini 2.5 Flash, OpenAI GPT-4o
 * **Vector Database:** ChromaDB (Local persistence)
 * **Embeddings:** HuggingFace (`all-MiniLM-L6-v2`) — *Runs locally for privacy & cost savings.*
 * **Search Tool:** DuckDuckGo Search
