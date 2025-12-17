@@ -15,7 +15,13 @@ This project goes beyond a simple chatbot. It is an **Agentic RAG System** built
 <img width="800" height="500" alt="Image" src="https://github.com/user-attachments/assets/c2d911be-3782-4bb2-a92f-b526a85a1fa3" />
 
 * **Need to understand a PDF?** It retrieves specific chunks from your uploaded files.
+
+<img width="800" height="500" alt="Image" src="https://github.com/user-attachments/assets/0deadb6f-25bc-4b6a-9f3f-76009d061907" />
+
 * **Need to summarize a video?** It fetches and analyzes YouTube transcripts.
+
+<img width="800" height="500" alt="Image" src="https://github.com/user-attachments/assets/31331596-b16a-42fc-aa72-d8a0b9f2d45b" />
+
 * **Need to remember context?** It uses a persistent SQLite database to store chat history.
 
 ## ✨ Key Features
