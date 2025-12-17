@@ -1,12 +1,15 @@
 import os
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings 
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.vectorstores import Chroma
+from langchain_classic.chains import RetrievalQA
+from langchain_classic.agents import initialize_agent, Tool, AgentType
+from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_classic.memory import ConversationBufferMemory
-from langchain_classic.chains import ConversationalRetrievalChain
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
@@ -42,27 +45,65 @@ def create_vector_db(splits):
     )
     return vectordb
 
-# 4. CHAIN
-def setup_chain(vectordb):
+# 4. AGENT
+def setup_agent(vectordb):
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash-lite", 
-        temperature=0.7,
-        convert_system_message_to_human=True 
+        model="gemma-3-27b", 
+        temperature=0, 
+        convert_system_message_to_human=True
     )
     
-    memory = ConversationBufferMemory(
-        memory_key="chat_history",
-        return_messages=True,
-        output_key='answer'
-    )
-    
+    # Tool 1: The "Reading" Tool 
     retriever = vectordb.as_retriever(search_kwargs={"k": 3})
-
-    qa_chain = ConversationalRetrievalChain.from_llm(
-        llm=llm,
-        retriever=retriever,
-        memory=memory,
-        return_source_documents=True,
-        verbose=True
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=llm, 
+        chain_type="stuff", 
+        retriever=retriever
     )
-    return qa_chain
+    
+    rag_tool = Tool(
+        name="Personal Knowledge Base",
+        func=qa_chain.run,
+        description="Useful for answering questions based on the uploaded documents. ALWAYS use this tool first if the user asks about the document content."
+    )
+    
+    # Tool 2: The "Search" Tool
+    search_tool = Tool(
+        name="Web Search",
+        func=DuckDuckGoSearchRun().run,
+        description="Useful for finding current information, news, or general knowledge not found in the documents."
+    )
+
+    tools = [rag_tool, search_tool]
+
+    memory = ConversationBufferMemory(
+        memory_key="chat_history", 
+        return_messages=True
+    )
+
+    today = datetime.now().strftime("%A, %B %d, %Y")
+    user_location = "Mumbai, India"
+
+    agent_kwargs = {
+        "prefix": (
+            "You are a helpful AI assistant. Today's date is {today}.\n"
+            "The user is located in {user_location}.\n"
+            "You have access to the following tools:\n\n"
+            "{tools}\n\n"
+            "When answering, you MUST return a valid JSON blob.\n"
+            "IMPORTANT: If your answer contains quotes, you MUST escape them (e.g., \"output\": \"She said \\\"Hello\\\"\").\n"
+            "Do not use markdown code blocks (like ```json). Just return the raw JSON."
+        )
+    }
+
+    agent = initialize_agent(
+        tools, 
+        llm, 
+        agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
+        verbose=True,
+        memory=memory,
+        agent_kwargs=agent_kwargs,
+        handle_parsing_errors=True 
+    )
+    
+    return agent

@@ -1,10 +1,10 @@
-import pysqlite3
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+#import pysqlite3
+#import sys
+#sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import streamlit as st
 import os
 import shutil
-from brain import load_documents, split_documents, create_vector_db, setup_chain
+from brain import load_documents, split_documents, create_vector_db, setup_agent
 
 st.set_page_config(page_title="Personal Brain 🧠", layout="wide")
 st.title("🤖 AI Knowledge Agent (Personal Brain)")
@@ -30,7 +30,7 @@ with st.sidebar:
                 splits = split_documents(docs)
                 vectordb = create_vector_db(splits)
                 
-                st.session_state.chain = setup_chain(vectordb)
+                st.session_state.chain = setup_agent(vectordb)
                 
                 try:
                     shutil.rmtree("temp_data")
@@ -41,16 +41,19 @@ with st.sidebar:
         else:
             st.warning("Please upload documents first.")
 
+# Chat Interface
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "chain" not in st.session_state:
     st.info("👈 Please upload documents in the sidebar to start.")
 else:
+    # Display chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
+    # User Input
     if prompt := st.chat_input("Ask your Personal Brain..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -58,15 +61,10 @@ else:
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                response = st.session_state.chain({"question": prompt})
-                answer = response['answer']
-                sources = response['source_documents']
+                # Run the Agent
+                # The agent takes "input" as the key, not "question"
+                response = st.session_state.chain.run(input=prompt)
                 
-                st.markdown(answer)
-                
-                with st.expander("📚 View Sources / Citations"):
-                    for i, doc in enumerate(sources):
-                        st.markdown(f"**Source {i+1}:** {doc.metadata.get('source', 'Unknown')}")
-                        st.caption(doc.page_content[:300] + "...")
+                st.markdown(response)
 
-        st.session_state.messages.append({"role": "assistant", "content": answer})
+        st.session_state.messages.append({"role": "assistant", "content": response})
