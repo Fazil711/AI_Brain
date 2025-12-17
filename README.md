@@ -11,6 +11,9 @@
 
 This project goes beyond a simple chatbot. It is an **Agentic RAG System** built with LangChain. Instead of just answering from training data, the AI acts as a reasoning engine that dynamically selects the best tool for the job:
 * **Need current news?** It searches the web.
+
+<img width="800" height="500" alt="Image" src="https://github.com/user-attachments/assets/c2d911be-3782-4bb2-a92f-b526a85a1fa3" />
+
 * **Need to understand a PDF?** It retrieves specific chunks from your uploaded files.
 * **Need to summarize a video?** It fetches and analyzes YouTube transcripts.
 * **Need to remember context?** It uses a persistent SQLite database to store chat history.
