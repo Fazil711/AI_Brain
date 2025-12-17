@@ -9,6 +9,9 @@ from langchain_classic.chains import RetrievalQA
 from langchain_classic.agents import initialize_agent, Tool, AgentType
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_classic.memory import ConversationBufferMemory
+from langchain_community.tools import YouTubeSearchTool 
+from langchain_community.document_loaders import YoutubeLoader
+import youtube_transcript_api
 from dotenv import load_dotenv
 from datetime import datetime
 
@@ -46,7 +49,26 @@ def create_vector_db(splits):
     )
     return vectordb
 
-# 4. AGENT
+# 4. YOUTUBE
+def get_youtube_transcript(video_url):
+    try:
+        loader = YoutubeLoader.from_youtube_url(
+            video_url, 
+            add_video_info=False, 
+            language=["en", "hi"] 
+        )
+        
+        docs = loader.load()
+        
+        if docs:
+            return docs[0].page_content[:4000]
+        else:
+            return "No transcript found."
+            
+    except Exception as e:
+        return f"Error fetching transcript: {str(e)}"
+    
+# 5. AGENT
 def setup_agent(vectordb, model_choice="Google Gemini"):
     
     if model_choice == "Google Gemini":
@@ -66,8 +88,14 @@ def setup_agent(vectordb, model_choice="Google Gemini"):
         func=DuckDuckGoSearchRun().run,
         description="Useful for finding current information, news, or general knowledge."
     )
-    
-    tools = [search_tool]
+
+    youtube_tool = Tool(
+        name="YouTube Analyzer",
+        func=get_youtube_transcript,
+        description="Useful for summarizing or answering questions about YouTube videos. Input should be a full YouTube URL."
+    )
+
+    tools = [search_tool, youtube_tool]
 
     if vectordb:
         retriever = vectordb.as_retriever(search_kwargs={"k": 3})

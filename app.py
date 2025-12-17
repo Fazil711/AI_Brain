@@ -1,22 +1,27 @@
-import pysqlite3
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+#import pysqlite3
+#import sys
+#sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import streamlit as st
 import os
 import shutil
+from history import init_db, load_history, save_message, clear_history
 from brain import load_documents, split_documents, create_vector_db, setup_agent
 
 st.set_page_config(page_title="Personal Brain 🧠", layout="wide")
 st.title("🤖 AI Knowledge Agent (Personal Brain)")
+
+if "db_initialized" not in st.session_state:
+    init_db()
+    st.session_state.db_initialized = True
+
 if "chain" not in st.session_state:
     st.session_state.chain = setup_agent(vectordb=None, model_choice="Google Gemini")
 
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = load_history() 
 
 with st.sidebar:
     st.header("🧠 Brain Settings")
-    
     model_choice = st.radio("Choose your Model:", ("Google Gemini", "OpenAI GPT-4o"))
     
     if st.button("Apply Model Change"):
@@ -49,10 +54,9 @@ with st.sidebar:
                     
                     st.session_state.vectordb = vectordb
                     st.session_state.chain = setup_agent(vectordb, model_choice)
-                    
-                    st.success("Brain Updated! Now I can read your files.")
+                    st.success("Brain Updated!")
                 except Exception as e:
-                    st.error(f"An error occurred: {e}")
+                    st.error(f"Error: {e}")
                 finally:
                     try:
                         shutil.rmtree("temp_data")
@@ -63,10 +67,11 @@ with st.sidebar:
 
     if st.button("🗑️ Reset / Clear Brain"):
         with st.spinner("Performing lobotomy..."):
-            
             st.session_state.vectordb = None
             st.session_state.chain = None
             st.session_state.messages = [] 
+            
+            clear_history()
             
             import gc
             gc.collect()
@@ -74,29 +79,31 @@ with st.sidebar:
             if os.path.exists("./chroma_db"):
                 try:
                     shutil.rmtree("./chroma_db")
-                    st.warning("Brain wipe successful! Memory deleted.")
                 except PermissionError:
-                    st.error("⚠️ Windows Locked the File! Please stop the app (Ctrl+C) and manually delete the 'chroma_db' folder.")
-            else:
-                st.info("Brain was already empty.")
+                    st.error("Windows Locked the File! Manual delete required.")
             
             st.session_state.chain = setup_agent(None, model_choice)
-            st.rerun() 
+            st.rerun()
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("Ask me anything (Web or Docs)..."):
+if prompt := st.chat_input("Ask me anything (YouTube, Web, or Docs)..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
+    
+    save_message("user", prompt)
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
                 response = st.session_state.chain.run(input=prompt)
                 st.markdown(response)
+                
                 st.session_state.messages.append({"role": "assistant", "content": response})
+                
+                save_message("assistant", response)
             except Exception as e:
                 st.error(f"Error: {e}")
