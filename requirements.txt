@@ -10,3 +10,4 @@ sentence-transformers
 pysqlite3-binary
 ddgs
 duckduckgo-search
+langchain-openai

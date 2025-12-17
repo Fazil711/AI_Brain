@@ -3,6 +3,7 @@ from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings 
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langchain_community.vectorstores import Chroma
 from langchain_classic.chains import RetrievalQA
 from langchain_classic.agents import initialize_agent, Tool, AgentType
@@ -46,63 +47,75 @@ def create_vector_db(splits):
     return vectordb
 
 # 4. AGENT
-def setup_agent(vectordb):
-    llm = ChatGoogleGenerativeAI(
-        model="gemma-3-27b", 
-        temperature=0, 
-        convert_system_message_to_human=True
-    )
+def setup_agent(vectordb, model_choice="Google Gemini"):
     
-    # Tool 1: The "Reading" Tool 
-    retriever = vectordb.as_retriever(search_kwargs={"k": 3})
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm, 
-        chain_type="stuff", 
-        retriever=retriever
-    )
-    
-    rag_tool = Tool(
-        name="Personal Knowledge Base",
-        func=qa_chain.run,
-        description="Useful for answering questions based on the uploaded documents. ALWAYS use this tool first if the user asks about the document content."
-    )
-    
-    # Tool 2: The "Search" Tool
+    if model_choice == "Google Gemini":
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash-lite", 
+            temperature=0, 
+            convert_system_message_to_human=True
+        )
+    elif model_choice == "OpenAI GPT-4o":
+        llm = ChatOpenAI(
+            model_name="gpt-4o", 
+            temperature=0
+        )
+
     search_tool = Tool(
         name="Web Search",
         func=DuckDuckGoSearchRun().run,
-        description="Useful for finding current information, news, or general knowledge not found in the documents."
+        description="Useful for finding current information, news, or general knowledge."
     )
+    
+    tools = [search_tool]
 
-    tools = [rag_tool, search_tool]
+    if vectordb:
+        retriever = vectordb.as_retriever(search_kwargs={"k": 3})
+        qa_chain = RetrievalQA.from_chain_type(
+            llm=llm, 
+            chain_type="stuff", 
+            retriever=retriever
+        )
+        rag_tool = Tool(
+            name="Personal Knowledge Base",
+            func=qa_chain.run,
+            description=(
+                "Useful for answering questions based on the uploaded documents. "
+                "IMPORTANT: Do not pass generic terms like 'document', 'file', or 'what is this' to this tool. "
+                "Instead, paraphrased the query to be specific. "
+                "Example: If user asks 'what is this?', input 'Summarize the main topics of the document'. "
+                "Example: If user asks 'explain', input 'Explain the core concepts found in the text'."
+            )
+        )
+        tools.append(rag_tool)
 
     memory = ConversationBufferMemory(
         memory_key="chat_history", 
         return_messages=True
     )
-
+    
     today = datetime.now().strftime("%A, %B %d, %Y")
-    user_location = "Mumbai, India"
+    user_location = "Mumbai, India" 
 
     agent_kwargs = {
         "prefix": (
-            "You are a helpful AI assistant. Today's date is {today}.\n"
-            "The user is located in {user_location}.\n"
+            f"You are a helpful AI assistant. Today's date is {today}.\n"
+            f"The user is located in {user_location}.\n"
             "You have access to the following tools:\n\n"
             "{tools}\n\n"
-            "When answering, you MUST return a valid JSON blob.\n"
-            "IMPORTANT: If your answer contains quotes, you MUST escape them (e.g., \"output\": \"She said \\\"Hello\\\"\").\n"
-            "Do not use markdown code blocks (like ```json). Just return the raw JSON."
+            "IMPORTANT NOTES:\n"
+            "1. For weather/news, ALWAYS append user location to the query.\n"
+            "2. Return a valid JSON blob. Escape quotes inside strings."
         )
     }
 
     agent = initialize_agent(
         tools, 
         llm, 
-        agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
+        agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION, 
         verbose=True,
         memory=memory,
-        agent_kwargs=agent_kwargs,
+        agent_kwargs=agent_kwargs, 
         handle_parsing_errors=True 
     )
     
