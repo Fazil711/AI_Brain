@@ -2,7 +2,7 @@
 
 **A multi-modal AI Agent that acts as a "Second Brain"—capable of reading documents, searching the live web, and analyzing YouTube videos in a single conversation.**
 
-🔴 **LIVE DEMO:** [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://agentic-ai-fazil-shaikh.streamlit.app/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://agentic-ai-fazil-shaikh.streamlit.app/)
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![LangChain](https://img.shields.io/badge/LangChain-Agents-green)
