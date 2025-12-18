@@ -24,6 +24,7 @@ This project goes beyond a simple chatbot. It is an **Agentic RAG System** built
 
 * **Need to analyze data?** It crunches numbers from CSV/Excel files and generates visual charts (Bar, Line, Scatter, etc.).
 <img width="800" height="500" alt="Image" src="https://github.com/user-attachments/assets/f913701c-1e83-4ff1-a86e-06018aac745d" />
+<img width="600" height="200" alt="Image" src="https://github.com/user-attachments/assets/6fc9292e-9c5f-4ec2-a063-6764ecb15483" />
 
 * **Need to remember context?** It uses a persistent SQLite database to store chat history.
 
