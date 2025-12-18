@@ -1,6 +1,6 @@
-#import pysqlite3
-#import sys
-#sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+import pysqlite3
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import streamlit as st
 import os
 import shutil
@@ -35,7 +35,6 @@ with st.sidebar:
     model_choice = st.radio("Choose your Model:", ("Google Gemini", "OpenAI GPT-4o"))
     
     if st.button("Apply Model Change"):
-        #current_db = st.session_state.get("vectordb", None)
         st.session_state.chain = setup_agent(
             vectordb=st.session_state.vectordb, 
             dataframes=st.session_state.dataframes, 
