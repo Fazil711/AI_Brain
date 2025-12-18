@@ -14,20 +14,46 @@ from langchain_community.document_loaders import YoutubeLoader
 import youtube_transcript_api
 from dotenv import load_dotenv
 from datetime import datetime
+import pandas as pd
+from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
 
 load_dotenv()
 
 # 1. LOADERS
 def load_documents(file_paths):
     docs = []
+    dataframes = []
+    
     for path in file_paths:
-        if path.endswith(".pdf"):
-            loader = PyPDFLoader(path)
-            docs.extend(loader.load())
-        elif path.endswith(".txt"):
-            loader = TextLoader(path)
-            docs.extend(loader.load())
-    return docs
+        try:
+            if path.endswith(".pdf"):
+                loader = PyPDFLoader(path)
+                docs.extend(loader.load())
+            
+            elif path.endswith(".txt"):
+                try:
+                    loader = TextLoader(path, encoding='utf-8')
+                    docs.extend(loader.load())
+                except UnicodeDecodeError:
+                    loader = TextLoader(path, encoding='latin-1')
+                    docs.extend(loader.load())
+
+            elif path.endswith(".csv"):
+                try:
+                    df = pd.read_csv(path, encoding='utf-8')
+                except UnicodeDecodeError:
+                    df = pd.read_csv(path, encoding='latin-1')
+                dataframes.append(df)
+            
+            elif path.endswith(".xlsx"):
+                df = pd.read_excel(path)
+                dataframes.append(df)
+                
+        except Exception as e:
+            print(f"Error loading {path}: {e}") 
+            continue 
+            
+    return docs, dataframes
 
 # 2. SPLITTING
 def split_documents(docs):
@@ -40,6 +66,9 @@ def split_documents(docs):
 
 # 3. VECTOR DB
 def create_vector_db(splits):
+    if not splits:
+        return None 
+    
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     
     vectordb = Chroma.from_documents(
@@ -49,7 +78,66 @@ def create_vector_db(splits):
     )
     return vectordb
 
-# 4. YOUTUBE
+# 4. DATA ANALYST TOOL 
+def create_csv_tool(dfs, llm):
+    if not dfs:
+        return None
+    
+    valid_dfs = [d for d in dfs if isinstance(d, pd.DataFrame)]
+    if not valid_dfs:
+        return None
+
+    df = valid_dfs[0] 
+    
+    prefix_instructions = """
+    You are working with a pandas dataframe in Python. The name of the dataframe is `df`.
+    
+    IMPORTANT RULES FOR PLOTTING:
+    1. If asked to visualize, use 'matplotlib.pyplot'.
+    2. ALWAYS save the plot to a file named 'visual.png'.
+    3. DO NOT use plt.show().
+    4. WHEN FINISHED, YOU MUST RESPOND WITH: "Final Answer: I have saved the plot to visual.png"
+    """
+    
+    try:
+        pandas_agent = create_pandas_dataframe_agent(
+            llm, 
+            df, 
+            verbose=True, 
+            allow_dangerous_code=True,
+            prefix=prefix_instructions, 
+            handle_parsing_errors=True 
+        )
+
+        def analyze_data(query):
+            if "plot" in query.lower() or "graph" in query.lower():
+                if os.path.exists("visual.png"):
+                    os.remove("visual.png")
+            
+            try:
+                result = pandas_agent.run(query)
+                return result
+            except Exception as e:
+                if os.path.exists("visual.png"):
+                    return "I have successfully generated the plot and saved it to visual.png."
+                else:
+                    return f"Error analyzing data: {str(e)}"
+
+        return Tool(
+            name="Data Analyst",
+            func=analyze_data,
+            description=(
+                "Useful for analyzing structured data (CSV/Excel). "
+                "The dataframe is ALREADY loaded in memory. "
+                "DO NOT ask to upload a file. "
+                "Just input the specific math or plotting question directly. "
+            )
+        )
+    except Exception as e:
+        print(f"Failed to create CSV tool: {e}")
+        return None
+
+# 5. YOUTUBE
 def get_youtube_transcript(video_url):
     try:
         loader = YoutubeLoader.from_youtube_url(
@@ -68,8 +156,8 @@ def get_youtube_transcript(video_url):
     except Exception as e:
         return f"Error fetching transcript: {str(e)}"
     
-# 5. AGENT
-def setup_agent(vectordb, model_choice="Google Gemini"):
+# 6. AGENT
+def setup_agent(vectordb, dataframes=None, model_choice="Google Gemini"):
     
     if model_choice == "Google Gemini":
         llm = ChatGoogleGenerativeAI(
@@ -117,6 +205,10 @@ def setup_agent(vectordb, model_choice="Google Gemini"):
         )
         tools.append(rag_tool)
 
+    csv_tool = create_csv_tool(dataframes, llm)
+    if csv_tool:
+        tools.append(csv_tool)
+
     memory = ConversationBufferMemory(
         memory_key="chat_history", 
         return_messages=True
@@ -144,7 +236,8 @@ def setup_agent(vectordb, model_choice="Google Gemini"):
         verbose=True,
         memory=memory,
         agent_kwargs=agent_kwargs, 
-        handle_parsing_errors=True 
+        handle_parsing_errors=True,
+        max_iterations=3
     )
     
     return agent

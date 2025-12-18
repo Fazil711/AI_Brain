@@ -13,3 +13,9 @@ duckduckgo-search
 langchain-openai
 youtube-transcript-api
 pytube
+pandas
+openpyxl
+langchain_experimental
+tabulate
+matplotlib
+seaborn
