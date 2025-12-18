@@ -14,20 +14,46 @@ from langchain_community.document_loaders import YoutubeLoader
 import youtube_transcript_api
 from dotenv import load_dotenv
 from datetime import datetime
+import pandas as pd
+from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
 
 load_dotenv()
 
 # 1. LOADERS
 def load_documents(file_paths):
     docs = []
+    dataframes = []
+    
     for path in file_paths:
-        if path.endswith(".pdf"):
-            loader = PyPDFLoader(path)
-            docs.extend(loader.load())
-        elif path.endswith(".txt"):
-            loader = TextLoader(path)
-            docs.extend(loader.load())
-    return docs
+        try:
+            if path.endswith(".pdf"):
+                loader = PyPDFLoader(path)
+                docs.extend(loader.load())
+            
+            elif path.endswith(".txt"):
+                try:
+                    loader = TextLoader(path, encoding='utf-8')
+                    docs.extend(loader.load())
+                except UnicodeDecodeError:
+                    loader = TextLoader(path, encoding='latin-1')
+                    docs.extend(loader.load())
+
+            elif path.endswith(".csv"):
+                try:
+                    df = pd.read_csv(path, encoding='utf-8')
+                except UnicodeDecodeError:
+                    df = pd.read_csv(path, encoding='latin-1')
+                dataframes.append(df)
+            
+            elif path.endswith(".xlsx"):
+                df = pd.read_excel(path)
+                dataframes.append(df)
+                
+        except Exception as e:
+            print(f"Error loading {path}: {e}") 
+            continue 
+            
+    return docs, dataframes
 
 # 2. SPLITTING
 def split_documents(docs):
@@ -40,6 +66,9 @@ def split_documents(docs):
 
 # 3. VECTOR DB
 def create_vector_db(splits):
+    if not splits:
+        return None 
+    
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     
     vectordb = Chroma.from_documents(
@@ -49,7 +78,49 @@ def create_vector_db(splits):
     )
     return vectordb
 
-# 4. YOUTUBE
+# 4. DATA ANALYST TOOL 
+def create_csv_tool(dfs, llm):
+    if not dfs:
+        return None
+    
+    valid_dfs = [d for d in dfs if isinstance(d, pd.DataFrame)]
+    
+    if not valid_dfs:
+        return None 
+
+    df = valid_dfs[0] 
+    
+    try:
+        pandas_agent = create_pandas_dataframe_agent(
+            llm, 
+            df, 
+            verbose=True, 
+            allow_dangerous_code=True,
+            agent_type=AgentType.OPENAI_FUNCTIONS
+        )
+
+        def analyze_data(query):
+            try:
+                return pandas_agent.run(query)
+            except Exception as e:
+                return f"Error analyzing data: {str(e)}"
+
+        return Tool(
+            name="Data Analyst",
+            func=analyze_data,
+            description=(
+                "Useful for analyzing structured data (CSV/Excel). "
+                "The dataframe is ALREADY loaded in memory. "
+                "DO NOT ask to upload a file. "
+                "DO NOT ask 'provide the file'. "
+                "Just input the specific math question directly. "
+            )
+        )
+    except Exception as e:
+        print(f"Failed to create CSV tool: {e}")
+        return None
+
+# 5. YOUTUBE
 def get_youtube_transcript(video_url):
     try:
         loader = YoutubeLoader.from_youtube_url(
@@ -68,8 +139,8 @@ def get_youtube_transcript(video_url):
     except Exception as e:
         return f"Error fetching transcript: {str(e)}"
     
-# 5. AGENT
-def setup_agent(vectordb, model_choice="Google Gemini"):
+# 6. AGENT
+def setup_agent(vectordb, dataframes=None, model_choice="Google Gemini"):
     
     if model_choice == "Google Gemini":
         llm = ChatGoogleGenerativeAI(
@@ -116,6 +187,10 @@ def setup_agent(vectordb, model_choice="Google Gemini"):
             )
         )
         tools.append(rag_tool)
+
+    csv_tool = create_csv_tool(dataframes, llm)
+    if csv_tool:
+        tools.append(csv_tool)
 
     memory = ConversationBufferMemory(
         memory_key="chat_history", 
