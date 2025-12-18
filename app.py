@@ -1,6 +1,6 @@
-import pysqlite3
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+#import pysqlite3
+#import sys
+#sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import streamlit as st
 import os
 import shutil
@@ -129,10 +129,16 @@ if prompt := st.chat_input("Ask me anything (YouTube, Web, or Docs)..."):
         with st.spinner("Thinking..."):
             try:
                 response = st.session_state.chain.run(input=prompt)
+                
                 st.markdown(response)
-                
                 st.session_state.messages.append({"role": "assistant", "content": response})
-                
                 save_message("assistant", response)
+                
+                if os.path.exists("visual.png"):
+
+                    st.image("visual.png", caption="Generated Visualization")
+                    
+                    os.remove("visual.png")
+                    
             except Exception as e:
                 st.error(f"Error: {e}")

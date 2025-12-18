@@ -84,11 +84,20 @@ def create_csv_tool(dfs, llm):
         return None
     
     valid_dfs = [d for d in dfs if isinstance(d, pd.DataFrame)]
-    
     if not valid_dfs:
-        return None 
+        return None
 
     df = valid_dfs[0] 
+    
+    prefix_instructions = """
+    You are working with a pandas dataframe in Python. The name of the dataframe is `df`.
+    
+    IMPORTANT RULES FOR PLOTTING:
+    1. If asked to visualize, use 'matplotlib.pyplot'.
+    2. ALWAYS save the plot to a file named 'visual.png'.
+    3. DO NOT use plt.show().
+    4. WHEN FINISHED, YOU MUST RESPOND WITH: "Final Answer: I have saved the plot to visual.png"
+    """
     
     try:
         pandas_agent = create_pandas_dataframe_agent(
@@ -96,14 +105,23 @@ def create_csv_tool(dfs, llm):
             df, 
             verbose=True, 
             allow_dangerous_code=True,
-            agent_type=AgentType.OPENAI_FUNCTIONS
+            prefix=prefix_instructions, 
+            handle_parsing_errors=True 
         )
 
         def analyze_data(query):
+            if "plot" in query.lower() or "graph" in query.lower():
+                if os.path.exists("visual.png"):
+                    os.remove("visual.png")
+            
             try:
-                return pandas_agent.run(query)
+                result = pandas_agent.run(query)
+                return result
             except Exception as e:
-                return f"Error analyzing data: {str(e)}"
+                if os.path.exists("visual.png"):
+                    return "I have successfully generated the plot and saved it to visual.png."
+                else:
+                    return f"Error analyzing data: {str(e)}"
 
         return Tool(
             name="Data Analyst",
@@ -112,8 +130,7 @@ def create_csv_tool(dfs, llm):
                 "Useful for analyzing structured data (CSV/Excel). "
                 "The dataframe is ALREADY loaded in memory. "
                 "DO NOT ask to upload a file. "
-                "DO NOT ask 'provide the file'. "
-                "Just input the specific math question directly. "
+                "Just input the specific math or plotting question directly. "
             )
         )
     except Exception as e:
@@ -219,7 +236,8 @@ def setup_agent(vectordb, dataframes=None, model_choice="Google Gemini"):
         verbose=True,
         memory=memory,
         agent_kwargs=agent_kwargs, 
-        handle_parsing_errors=True 
+        handle_parsing_errors=True,
+        max_iterations=3
     )
     
     return agent
